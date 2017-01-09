@@ -43,6 +43,10 @@ type GameScene struct {
 
 	// currentShipPitch is the current Pitch rotation for the ship in radians.
 	currentShipPitch float32
+
+	currentShipSpeed mgl.Vec3 // m/s
+
+	timeSinceLastSpawn float32
 }
 
 // NewGameScene creates a new game scene object
@@ -63,19 +67,52 @@ func (s *GameScene) Update(frameDelta float32) {
 	// call the base version which will update the systems
 	s.BasicSceneManager.Update(frameDelta)
 
-	// HACK: move the ship entity forward at 1 m/s
-	const speed = 0.01
-	deltaPos := mgl.Vec3{0, 0, speed * frameDelta}
-	updatedLoc := s.shipEntity.GetLocation().Add(deltaPos)
-	s.shipEntity.SetLocation(updatedLoc)
+	// HACK: spawn walls here
+	s.SpawnNewWalls()
 
-	// HACK: and make the camera follow
-	updatedLoc = s.playerEntity.GetLocation().Add(deltaPos)
-	s.playerEntity.SetLocation(updatedLoc)
-	// and rotate the ship
+	// HACK: and rotate the ship
 	qRoll := mgl.QuatRotate(s.currentShipRoll, mgl.Vec3{0.0, 0.0, 1.0})
 	qPitch := mgl.QuatRotate(s.currentShipPitch, mgl.Vec3{1.0, 0.0, 0.0})
 	s.shipEntity.SetOrientation(qRoll.Mul(qPitch))
+
+	// HACK: go through all entities and update positions of everything
+	// that's not the player
+	wallsToRemove := []scene.Entity{}
+	backwardSpeed := s.currentShipSpeed.Mul(-s.currentFrameDelta)
+	fmt.Printf("backward speed of %v is %v\n", s.currentShipSpeed, backwardSpeed)
+	s.BasicSceneManager.MapEntities(func(id uint64, e scene.Entity) {
+		// skip the ship and the player entities
+		if id == s.shipEntity.ID || id == s.playerEntity.ID {
+			return
+		}
+
+		// move the floor grid in a special way. we only move it a fraction of a meter.
+		// once it's deviated more than a meter away we recenter it on world origin so that
+		// we never run out of grid plane.
+		if e.GetName() == "GridFloor" {
+			loc := e.GetLocation().Add(backwardSpeed)
+			// only handles movement on z axis right now
+			if loc[2] > 1.0 {
+				loc[2] = float32(loc[2] - float32(math.Floor(float64(loc[2]))))
+			}
+			e.SetLocation(loc)
+			return
+		}
+
+		// move everything else back the current speed of the ship
+		loc := e.GetLocation().Add(backwardSpeed)
+		e.SetLocation(loc)
+		fmt.Printf("Entity %d location is %v\n", e.GetID(), loc)
+
+		// HACK: bad test
+		if loc[2] < -200.0 {
+			wallsToRemove = append(wallsToRemove, e)
+		}
+	})
+
+	for _, toRemove := range wallsToRemove {
+		s.RemoveEntity(toRemove)
+	}
 }
 
 // SetupScene initializes the scene's assets and sets up the initial entities.
@@ -110,6 +147,7 @@ func (s *GameScene) SetupScene() error {
 
 	// TODO: don't hardcode the component references here
 	s.components.LoadComponentFromFile("assets/components/ship.json", "entity/ship")
+	s.components.LoadComponentFromFile("assets/components/wall_8mx4m.json", "geom/wall_8mx4m")
 
 	// put a light in there
 	light := renderSystem.Renderer.NewDirectionalLight(mgl.Vec3{1.0, -0.5, -1.0})
@@ -117,13 +155,6 @@ func (s *GameScene) SetupScene() error {
 	light.SpecularIntensity = 0.10
 	light.AmbientIntensity = 1.0
 	renderSystem.Renderer.ActiveLights[0] = light
-
-	// create the player entity
-	s.playerEntity = NewVisibleEntity()
-	s.playerEntity.ID = s.GetNextID()
-	s.playerEntity.Name = playerEntityName
-	s.playerEntity.SetLocation(mgl.Vec3{0, 0, 1.0})
-	s.AddEntity(s.playerEntity)
 
 	// create the 'infinite' grid plane
 	const floorSize = 2000.0
@@ -135,17 +166,19 @@ func (s *GameScene) SetupScene() error {
 	gridFloor.Material.CustomTex[0] = gridPatternTex
 	gridFloorEntity := NewVisibleEntity()
 	gridFloorEntity.ID = s.GetNextID()
+	gridFloorEntity.Name = "GridFloor"
 	gridFloorEntity.Renderable = gridFloor
 	s.AddEntity(gridFloorEntity)
 
 	// FIXME: quick test to make sure I can add the ship in
 	shipComponent, _ := s.components.GetComponent("entity/ship")
-	shipRenderable := shipComponent.GetRenderable(s.textureMan, s.shaders)
+	shipRenderable := s.components.GetRenderableInstance(shipComponent)
 	s.shipEntity = NewVisibleEntity()
 	s.shipEntity.ID = s.GetNextID()
 	s.shipEntity.Renderable = shipRenderable
 	s.shipEntity.SetLocation(mgl.Vec3{0.0, 1.0, 0.0})
 	s.AddEntity(s.shipEntity)
+	s.currentShipSpeed = mgl.Vec3{0.0, 0.0, 25.0}
 
 	// create the player entity
 	s.playerEntity = NewVisibleEntity()
@@ -303,4 +336,33 @@ func (s *GameScene) HandleAxisLUpdate(axisData [vr.ControllerStateAxisCount]vr.C
 	//fmt.Printf("LTouchpad X:%f Y:%f Acum:%f Accel:%f Decay:%f\n",
 	//	axisData[0].X, axisData[0].Y, s.currentShipPitch, accDelta, decayDelta)
 	//}
+}
+
+// SpawnNewWalls will spawn new walls for the player to fly around if
+// the time is right.
+func (s *GameScene) SpawnNewWalls() {
+	const spawnTime = 4.0 // a new wall every x seconds
+
+	// update our timer for spawning walls
+	s.timeSinceLastSpawn += s.currentFrameDelta
+	if s.timeSinceLastSpawn < spawnTime {
+		return
+	}
+
+	const spawnDistance = 100.0 // spawn x meters away
+
+	// get the wall component to spawn
+	wallComponent, _ := s.components.GetComponent("geom/wall_8mx4m")
+	wallRenderable := s.components.GetRenderableInstance(wallComponent)
+	wallEntity := NewVisibleEntity()
+	wallEntity.ID = s.GetNextID()
+	wallEntity.Name = "Wall_8mx4m"
+	wallEntity.Renderable = wallRenderable
+	wallEntity.SetLocation(mgl.Vec3{0.0, 0.0, 1.0 * spawnDistance})
+	s.AddEntity(wallEntity)
+
+	s.timeSinceLastSpawn = 0.0
+
+	// DEBUG
+	fmt.Printf("Spawned a wall at %f\n", wallEntity.GetLocation())
 }

@@ -19,6 +19,8 @@ type RenderableEntity interface {
 type VisibleEntity struct {
 	*scene.BasicEntity
 
+	// Renderable is the model to draw for the entity if one should be
+	// drawn -- it is valid to have a nil Renderable here.
 	Renderable *fizzle.Renderable
 }
 
@@ -41,7 +43,7 @@ func (e *VisibleEntity) SetLocation(pos mgl.Vec3) {
 	if e.Renderable != nil {
 		e.Renderable.Location = pos
 	}
-	// TODO: upate collision objects too at some point (when using them)
+	// TODO: update collision objects too at some point (when using them)
 }
 
 // SetOrientation is a helper function to set the orientation of the entity as
