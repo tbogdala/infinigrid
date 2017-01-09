@@ -1,0 +1,10 @@
+*.exe
+*.dll
+*.swp
+.vscode
+debug
+
+# we don't version the assets here
+assets-src
+assets
+
