@@ -18,6 +18,12 @@ import (
 
 const (
 	playerEntityName = "Player"
+
+	maxRollRads  = math.Pi / 4.0 // 45 deg
+	maxPitchRads = math.Pi / 8.0 // 22.5 deg
+
+	floorSizeLength = 300.0
+	floorSizeWidth  = 10.0
 )
 
 // GameScene is the main game scene that plays the current level.
@@ -75,11 +81,22 @@ func (s *GameScene) Update(frameDelta float32) {
 	qPitch := mgl.QuatRotate(s.currentShipPitch, mgl.Vec3{1.0, 0.0, 0.0})
 	s.shipEntity.SetOrientation(qRoll.Mul(qPitch))
 
+	// HACK: move the ship in the world x/y axis at a speed determined
+	// by the proportion of current roll/pitch to the maximum values.
+	rollRatio := s.currentShipRoll / maxRollRads
+	pitchRatio := s.currentShipPitch / maxPitchRads
+	const moveSpeed = 1.0 // 1 m/s
+	shipLoc := s.shipEntity.GetLocation()
+	shipLoc[0] -= moveSpeed * rollRatio * frameDelta
+	shipLoc[0] = mgl.Clamp(shipLoc[0], -floorSizeWidth/2.0, floorSizeWidth/2.0)
+	shipLoc[1] -= moveSpeed * pitchRatio * frameDelta
+	shipLoc[1] = mgl.Clamp(shipLoc[1], 0.1, 2.0)
+	s.shipEntity.SetLocation(shipLoc)
+
 	// HACK: go through all entities and update positions of everything
 	// that's not the player
 	wallsToRemove := []scene.Entity{}
 	backwardSpeed := s.currentShipSpeed.Mul(-s.currentFrameDelta)
-	fmt.Printf("backward speed of %v is %v\n", s.currentShipSpeed, backwardSpeed)
 	s.BasicSceneManager.MapEntities(func(id uint64, e scene.Entity) {
 		// skip the ship and the player entities
 		if id == s.shipEntity.ID || id == s.playerEntity.ID {
@@ -92,8 +109,8 @@ func (s *GameScene) Update(frameDelta float32) {
 		if e.GetName() == "GridFloor" {
 			loc := e.GetLocation().Add(backwardSpeed)
 			// only handles movement on z axis right now
-			if loc[2] > 1.0 {
-				loc[2] = float32(loc[2] - float32(math.Floor(float64(loc[2]))))
+			if loc[2] < -1.0 {
+				loc[2] += 1.0
 			}
 			e.SetLocation(loc)
 			return
@@ -102,7 +119,6 @@ func (s *GameScene) Update(frameDelta float32) {
 		// move everything else back the current speed of the ship
 		loc := e.GetLocation().Add(backwardSpeed)
 		e.SetLocation(loc)
-		fmt.Printf("Entity %d location is %v\n", e.GetID(), loc)
 
 		// HACK: bad test
 		if loc[2] < -200.0 {
@@ -157,8 +173,7 @@ func (s *GameScene) SetupScene() error {
 	renderSystem.Renderer.ActiveLights[0] = light
 
 	// create the 'infinite' grid plane
-	const floorSize = 2000.0
-	gridFloor := fizzle.CreatePlaneXZ(-floorSize, floorSize, floorSize, -floorSize)
+	gridFloor := fizzle.CreatePlaneXZ(-floorSizeWidth/2.0, floorSizeLength/2.0, floorSizeWidth/2.0, -floorSizeLength/2.0)
 	gridFloor.Material = fizzle.NewMaterial()
 	gridFloor.Material.Shader = s.shaders["GridFloor"]
 	gridFloor.Material.DiffuseColor = mgl.Vec4{float32(0x66) / 255.0, float32(0xA8) / 255.0, 0.00, 1.0}
@@ -272,11 +287,8 @@ func (s *GameScene) HandleAxisLUpdate(axisData [vr.ControllerStateAxisCount]vr.C
 	// towards a maximum value. If no input on the corresponding axis is
 	// detected, then the accumulator should decay at a separate speed towards 0.
 
-	const maxRollRads = math.Pi / 4.0 // 45 deg
-	const rollAccumulatorFactor = 0.2 // sec until max roll
-	const rollDecayFactor = 0.4       // sec until roll decays to 0 from max
-
-	const maxPitchRads = math.Pi / 8.0 // 22.5 deg
+	const rollAccumulatorFactor = 0.2  // sec until max roll
+	const rollDecayFactor = 0.4        // sec until roll decays to 0 from max
 	const pitchAccumulatorFactor = 0.1 // sec until max pitch
 	const pitchDecayFactor = 0.2       // sec until pitch decays to 0 from max
 
