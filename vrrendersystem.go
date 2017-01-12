@@ -22,7 +22,7 @@ const (
 	vrRenderSystemPriority = 100.0
 	vrRenderSystemName     = "VRRenderSystem"
 	nearView               = 0.1
-	farView                = 30.0
+	farView                = 300.0
 )
 
 // VRRenderSystem implements fizzle/scene/System interface and handles the rendering
@@ -66,6 +66,11 @@ func NewVRRenderSystem() *VRRenderSystem {
 // GetVRSystem returns the vr.System interface that was obtained during Initialize().
 func (rs *VRRenderSystem) GetVRSystem() *vr.System {
 	return rs.vrSystem
+}
+
+// GetVRCompositor return the vr.Compositor interface that was obtained during Initialize().
+func (rs *VRRenderSystem) GetVRCompositor() *vr.Compositor {
+	return rs.vrCompositor
 }
 
 // GetHMDLocation returns a vector describing the location of the HMD in the 'room'.

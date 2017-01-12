@@ -73,19 +73,46 @@ func (s *GameScene) Update(frameDelta float32) {
 	// call the base version which will update the systems
 	s.BasicSceneManager.Update(frameDelta)
 
+	// ======================================================================
 	// HACK: spawn walls here
 	s.SpawnNewWalls()
+
+	// ======================================================================
+	// HACK: move the ship in the world x/y axis at a speed determined
+	// by the proportion of current roll/pitch to the maximum values.
+	var orientation mgl.Vec3
+	vrSystem := s.cachedRenderSystem.GetVRSystem()
+	vrCompositor := s.cachedRenderSystem.GetVRCompositor()
+	for i := vr.TrackedDeviceIndexHmd + 1; i < vr.MaxTrackedDeviceCount; i++ {
+		deviceClass := vrSystem.GetTrackedDeviceClass(int(i))
+		if deviceClass != vr.TrackedDeviceClassController {
+			continue
+		}
+
+		// we don't track controllers that are powered off
+		if !vrSystem.IsTrackedDeviceConnected(uint32(i)) {
+			continue
+		}
+
+		controllerPose := vrCompositor.GetRenderPose(i)
+		forward := mgl.Vec4{0.0, 0.0, -1.0, 0.0}
+		orientation = controllerPose.DeviceToAbsoluteTracking.Mul4x1(forward) //vec3 return
+		break
+	}
+	rollInput := orientation[0] // axisData[0].X
+	s.currentShipRoll = -rollInput * maxRollRads
+	pitchInput := orientation[2] // axisData[0].Y
+	s.currentShipPitch = pitchInput * maxPitchRads
 
 	// HACK: and rotate the ship
 	qRoll := mgl.QuatRotate(s.currentShipRoll, mgl.Vec3{0.0, 0.0, 1.0})
 	qPitch := mgl.QuatRotate(s.currentShipPitch, mgl.Vec3{1.0, 0.0, 0.0})
 	s.shipEntity.SetOrientation(qRoll.Mul(qPitch))
 
-	// HACK: move the ship in the world x/y axis at a speed determined
-	// by the proportion of current roll/pitch to the maximum values.
+	// HACK: move the ship around
 	rollRatio := s.currentShipRoll / maxRollRads
 	pitchRatio := s.currentShipPitch / maxPitchRads
-	const moveSpeed = 1.0 // 1 m/s
+	const moveSpeed = 3.0 // 1 m/s
 	shipLoc := s.shipEntity.GetLocation()
 	shipLoc[0] -= moveSpeed * rollRatio * frameDelta
 	shipLoc[0] = mgl.Clamp(shipLoc[0], -floorSizeWidth/2.0, floorSizeWidth/2.0)
@@ -93,6 +120,14 @@ func (s *GameScene) Update(frameDelta float32) {
 	shipLoc[1] = mgl.Clamp(shipLoc[1], 0.1, 2.0)
 	s.shipEntity.SetLocation(shipLoc)
 
+	// HACK: glue the HMD to the ship
+	hmdLoc := s.cachedRenderSystem.GetHMDLocation()
+	s.playerEntity.SetLocation(s.shipEntity.GetLocation().Add(mgl.Vec3{
+		0.0 - hmdLoc[0],
+		0.2 - hmdLoc[1],
+		-0.5 - hmdLoc[2]}))
+
+	// ======================================================================
 	// HACK: go through all entities and update positions of everything
 	// that's not the player
 	wallsToRemove := []scene.Entity{}
@@ -125,7 +160,6 @@ func (s *GameScene) Update(frameDelta float32) {
 			wallsToRemove = append(wallsToRemove, e)
 		}
 	})
-
 	for _, toRemove := range wallsToRemove {
 		s.RemoveEntity(toRemove)
 	}
@@ -276,78 +310,7 @@ func (s *GameScene) HandleHeadAutoLevel() {
 	s.playerEntity.SetLocation(s.shipEntity.GetLocation().Add(mgl.Vec3{
 		0.0 - hmdLoc[0],
 		0.2 - hmdLoc[1],
-		-0.25 - hmdLoc[2]}))
-}
-
-// HandleAxisLUpdate is a DEBUG / TEST input callback
-// FIXME: rename if finalized
-func (s *GameScene) HandleAxisLUpdate(axisData [vr.ControllerStateAxisCount]vr.ControllerAxis) {
-	// Ship roll / pitch will not be a direct value from the trackpad [0..1].
-	// Instead the trackpad value will scale a speed variable and accumulate
-	// towards a maximum value. If no input on the corresponding axis is
-	// detected, then the accumulator should decay at a separate speed towards 0.
-
-	const rollAccumulatorFactor = 0.2  // sec until max roll
-	const rollDecayFactor = 0.4        // sec until roll decays to 0 from max
-	const pitchAccumulatorFactor = 0.1 // sec until max pitch
-	const pitchDecayFactor = 0.2       // sec until pitch decays to 0 from max
-
-	var accDelta float32
-	var decayDelta float32
-
-	// Check to see if there's any movement on the X axis to determine roll.
-	rollInput := axisData[0].X
-	if rollInput != 0.0 {
-		// we are in a roll so accumulate a value. this will automatically
-		// account for direction based on the sign of the axis value.
-		accDelta = rollInput * (s.currentFrameDelta / rollAccumulatorFactor) * maxRollRads
-		s.currentShipRoll += accDelta
-		s.currentShipRoll = mgl.Clamp(s.currentShipRoll, -maxRollRads, maxRollRads)
-	} else {
-		// are we currently in a roll with no further input from user
-		if s.currentShipRoll != 0.0 {
-			// decay the roll accumulator down to 0.0, but this can be from
-			// a negative rotation or a positive rotation.
-			decayDelta = (s.currentFrameDelta / rollDecayFactor) * maxRollRads
-			if s.currentShipRoll > 0.0 {
-				s.currentShipRoll -= decayDelta
-				s.currentShipRoll = mgl.Clamp(s.currentShipRoll, 0.0, s.currentShipRoll)
-			} else if s.currentShipRoll < 0.0 {
-				s.currentShipRoll += decayDelta
-				s.currentShipRoll = mgl.Clamp(s.currentShipRoll, s.currentShipRoll, 0.0)
-			}
-		}
-	}
-
-	pitchInput := axisData[0].Y
-	if pitchInput != 0.0 {
-		// we are in a roll so accumulate a value. this will automatically
-		// account for direction based on the sign of the axis value.
-		accDelta = pitchInput * (s.currentFrameDelta / pitchAccumulatorFactor) * maxPitchRads
-		s.currentShipPitch += accDelta
-		s.currentShipPitch = mgl.Clamp(s.currentShipPitch, -maxPitchRads, maxPitchRads)
-	} else {
-		// are we currently in a roll with no further input from user
-		if s.currentShipPitch != 0.0 {
-			// decay the roll accumulator down to 0.0, but this can be from
-			// a negative rotation or a positive rotation.
-			decayDelta = (s.currentFrameDelta / pitchDecayFactor) * maxPitchRads
-			if s.currentShipPitch > 0.0 {
-				s.currentShipPitch -= decayDelta
-				s.currentShipPitch = mgl.Clamp(s.currentShipPitch, 0.0, s.currentShipPitch)
-			} else if s.currentShipPitch < 0.0 {
-				s.currentShipPitch += decayDelta
-				s.currentShipPitch = mgl.Clamp(s.currentShipPitch, s.currentShipPitch, 0.0)
-			}
-		}
-	}
-
-	// DEBUG **
-	// check to see if Axis0 (touchpad) has a non-zero X or Y
-	//if axisData[0].X != 0.0 || axisData[0].Y != 0.0 {
-	//fmt.Printf("LTouchpad X:%f Y:%f Acum:%f Accel:%f Decay:%f\n",
-	//	axisData[0].X, axisData[0].Y, s.currentShipPitch, accDelta, decayDelta)
-	//}
+		-0.5 - hmdLoc[2]}))
 }
 
 // SpawnNewWalls will spawn new walls for the player to fly around if

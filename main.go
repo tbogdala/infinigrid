@@ -55,7 +55,6 @@ func main() {
 	////////////////////////////////////////////////////////////////////////////
 	// wire some inputs for the vive wands
 	inputSystem.OnAppMenuButtonL = gameScene.HandleHeadAutoLevel
-	inputSystem.OnControllerAxisUpdateL = gameScene.HandleAxisLUpdate
 
 	////////////////////////////////////////////////////////////////////////////
 	// set the callback functions for key input
