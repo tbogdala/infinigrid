@@ -1,4 +1,4 @@
-// Copyright 2016, Timothy Bogdala <tdb@animal-machine.com>
+// Copyright 2017, Timothy Bogdala <tdb@animal-machine.com>
 // See the LICENSE file for more details.
 
 package main
@@ -43,7 +43,9 @@ func (e *VisibleEntity) SetLocation(pos mgl.Vec3) {
 	if e.Renderable != nil {
 		e.Renderable.Location = pos
 	}
-	// TODO: update collision objects too at some point (when using them)
+	for _, c := range e.CoarseColliders {
+		c.SetOffset(&pos)
+	}
 }
 
 // SetOrientation is a helper function to set the orientation of the entity as

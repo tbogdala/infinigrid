@@ -1,13 +1,15 @@
-// Copyright 2016, Timothy Bogdala <tdb@animal-machine.com>
+// Copyright 2017, Timothy Bogdala <tdb@animal-machine.com>
 // See the LICENSE file for more details.
 
 package main
 
 import (
+	"flag"
 	"fmt"
-	"os"
 	"runtime"
 	"time"
+
+	"github.com/tbogdala/fizzle/scene"
 
 	vr "github.com/tbogdala/openvr-go"
 
@@ -23,6 +25,8 @@ const (
 
 var (
 	kbModel *input.KeyboardModel
+
+	flagUseVR = flag.Bool("vr", false, "run the game in VR mode")
 )
 
 func init() {
@@ -31,43 +35,72 @@ func init() {
 
 func main() {
 	var err error
+	flag.Parse()
 
-	// create the render system and initialize it
-	renderSystem := NewVRRenderSystem()
-	err = renderSystem.Initialize("GRID", windowWidth, windowHeight)
-	if err != nil {
-		fmt.Printf("Failed to initialize the VR render system! %v", err)
-		os.Exit(1)
+	var renderSystem RenderSystem
+	var renderSceneSystem scene.System
+	var inputSceneSystem scene.System
+
+	// setup vr mode if indicated via command line flag
+	if *flagUseVR {
+		// create the render system and initialize it
+		vrRenderSystem := NewVRRenderSystem()
+		err = vrRenderSystem.Initialize("GRID", windowWidth, windowHeight)
+		if err != nil {
+			fmt.Printf("Failed to initialize the VR render system! %v", err)
+			return
+		}
+
+		// create the vr input system to handle the vr controllers
+		vrInputSystem := NewVRInputSystem()
+		vrInputSystem.Initialize(vrRenderSystem)
+
+		// wire some inputs for the vive wands
+		vrInputSystem.OnAppMenuButtonL = vrInputSystem.HandleHeadAutoLevel
+
+		renderSystem = vrRenderSystem
+		renderSceneSystem = vrRenderSystem
+		inputSceneSystem = vrInputSystem
+	} else {
+		// no vr flag was specified so construct a normal renderer
+		forwardRenderSystem := NewForwardRenderSystem()
+		err = forwardRenderSystem.Initialize("GRID", windowWidth, windowHeight)
+		if err != nil {
+			fmt.Printf("Failed to initialize the VR render system! %v", err)
+			return
+		}
+
+		// create the keyboard interface to the game
+		kbInputSystem := NewKeyboardInputSystem()
+		kbInputSystem.Initialize(forwardRenderSystem.GetMainWindow())
+
+		renderSystem = forwardRenderSystem
+		renderSceneSystem = forwardRenderSystem
+		inputSceneSystem = kbInputSystem
 	}
 
-	// create the vr input system to handle the vr controllers
-	inputSystem := NewVRInputSystem()
-	inputSystem.Initialize(renderSystem.GetVRSystem())
-
+	////////////////////////////////////////////////////////////////////////////
 	// create a scene manager
 	gameScene := NewGameScene()
-	gameScene.AddSystem(renderSystem)
-	gameScene.AddSystem(inputSystem)
+	gameScene.AddSystem(renderSceneSystem)
+	gameScene.AddSystem(inputSceneSystem)
 
 	// create some objects and lights
 	gameScene.SetupScene()
 
 	////////////////////////////////////////////////////////////////////////////
-	// wire some inputs for the vive wands
-	inputSystem.OnAppMenuButtonL = gameScene.HandleHeadAutoLevel
-
-	////////////////////////////////////////////////////////////////////////////
-	// set the callback functions for key input
-	kbModel = input.NewKeyboardModel(renderSystem.MainWindow)
+	// set the callback functions for key input common to all input systems
+	mainWindow := renderSystem.GetMainWindow()
+	kbModel = input.NewKeyboardModel(mainWindow)
 	kbModel.BindTrigger(glfw.KeyEscape, func() {
-		renderSystem.MainWindow.SetShouldClose(true)
+		mainWindow.SetShouldClose(true)
 	})
 	kbModel.SetupCallbacks()
 
 	////////////////////////////////////////////////////////////////////////////
 	// the main application loop
 	lastFrame := time.Now()
-	for !renderSystem.MainWindow.ShouldClose() {
+	for !mainWindow.ShouldClose() {
 		// calculate the difference in time to control rotation speed
 		thisFrame := time.Now()
 		frameDelta := float32(thisFrame.Sub(lastFrame).Seconds())

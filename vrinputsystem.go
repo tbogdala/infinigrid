@@ -1,9 +1,10 @@
-// Copyright 2016, Timothy Bogdala <tdb@animal-machine.com>
+// Copyright 2017, Timothy Bogdala <tdb@animal-machine.com>
 // See the LICENSE file for more details.
 
 package main
 
 import (
+	mgl "github.com/go-gl/mathgl/mgl32"
 	scene "github.com/tbogdala/fizzle/scene"
 	vr "github.com/tbogdala/openvr-go"
 )
@@ -54,6 +55,18 @@ type VRInputSystem struct {
 
 	// vrSystem is the IVRSystem interface for OpenVR set on Initialize().
 	vrSystem *vr.System
+
+	// vrCompositor is the IVRCompositor interface for OpenVR set on Initialize().
+	vrCompositor *vr.Compositor
+
+	// vrRenderSystem is the cached vrrender system object for the game
+	vrRenderSystem *VRRenderSystem
+
+	// playerEntity is the cached reference to the player entity.
+	playerEntity *VisibleEntity
+
+	// playerShipEntity is the cached reference to the player ship pawn.
+	playerShipEntity *ShipEntity
 }
 
 // NewVRInputSystem creates a new InputSystem object
@@ -63,8 +76,10 @@ func NewVRInputSystem() *VRInputSystem {
 }
 
 // Initialize sets up the input models for the scene.
-func (s *VRInputSystem) Initialize(vrSystem *vr.System) {
-	s.vrSystem = vrSystem
+func (s *VRInputSystem) Initialize(vrRenderSystem *VRRenderSystem) {
+	s.vrRenderSystem = vrRenderSystem
+	s.vrSystem = s.vrRenderSystem.GetVRSystem()
+	s.vrCompositor = s.vrRenderSystem.GetVRCompositor()
 }
 
 // Update should get called to run updates for the system every frame
@@ -124,18 +139,95 @@ func (s *VRInputSystem) Update(frameDelta float32) {
 		}
 		foundLeft = true
 	}
+
+	// after updating the controller state, adjust the player position
+	// based on the input.
+	s.movePlayer(frameDelta)
+}
+
+// movePlayer moves the ship in the world x/y axis at a speed determined
+// by the proportion of current roll/pitch to the maximum values.
+func (s *VRInputSystem) movePlayer(frameDelta float32) {
+	var orientation mgl.Vec3
+	for i := vr.TrackedDeviceIndexHmd + 1; i < vr.MaxTrackedDeviceCount; i++ {
+		deviceClass := s.vrSystem.GetTrackedDeviceClass(int(i))
+		if deviceClass != vr.TrackedDeviceClassController {
+			continue
+		}
+
+		// we don't track controllers that are powered off
+		if !s.vrSystem.IsTrackedDeviceConnected(uint32(i)) {
+			continue
+		}
+
+		controllerPose := s.vrCompositor.GetRenderPose(i)
+		forward := mgl.Vec4{0.0, 0.0, -1.0, 0.0}
+		orientation = controllerPose.DeviceToAbsoluteTracking.Mul4x1(forward) //vec3 return
+		break
+	}
+	rollInput := orientation[0] // axisData[0].X
+	s.playerShipEntity.currentShipRoll = -rollInput * maxRollRads
+	pitchInput := orientation[2] // axisData[0].Y
+	s.playerShipEntity.currentShipPitch = pitchInput * maxPitchRads
+
+	// HACK: and rotate the ship
+	qRoll := mgl.QuatRotate(s.playerShipEntity.currentShipRoll, mgl.Vec3{0.0, 0.0, 1.0})
+	qPitch := mgl.QuatRotate(s.playerShipEntity.currentShipPitch, mgl.Vec3{1.0, 0.0, 0.0})
+	s.playerShipEntity.SetOrientation(qRoll.Mul(qPitch))
+
+	// HACK: move the ship around
+	rollRatio := s.playerShipEntity.currentShipRoll / maxRollRads
+	pitchRatio := s.playerShipEntity.currentShipPitch / maxPitchRads
+	const moveSpeed = 20.0 // 1 m/s
+	shipLoc := s.playerShipEntity.GetLocation()
+	shipLoc[0] -= moveSpeed * rollRatio * frameDelta
+	shipLoc[0] = mgl.Clamp(shipLoc[0], -floorSizeWidth/2.0, floorSizeWidth/2.0)
+	shipLoc[1] -= moveSpeed * pitchRatio * frameDelta
+	shipLoc[1] = mgl.Clamp(shipLoc[1], 0.1, 3.0)
+	s.playerShipEntity.SetLocation(shipLoc)
+
+	// HACK: glue the HMD to the ship
+	hmdLoc := s.vrRenderSystem.GetHMDLocation()
+	s.playerEntity.SetLocation(s.playerShipEntity.GetLocation().Add(mgl.Vec3{
+		0.0 - hmdLoc[0],
+		0.2 - hmdLoc[1],
+		-0.5 - hmdLoc[2]}))
+}
+
+// HandleHeadAutoLevel should be called to set the auto-level 'head' position. This allows
+// for the HMD to move around and affect the camera, but be centered appropriately for a
+// sitting position.
+func (s *VRInputSystem) HandleHeadAutoLevel() {
+	// update the playerEntity's height to account for a new calibration of
+	// the HMD head position
+	hmdLoc := s.vrRenderSystem.GetHMDLocation()
+	s.playerEntity.SetLocation(s.playerShipEntity.GetLocation().Add(mgl.Vec3{
+		0.0 - hmdLoc[0],
+		0.2 - hmdLoc[1],
+		-0.5 - hmdLoc[2]}))
 }
 
 // OnAddEntity should get called by the scene Manager each time a new entity
 // has been added to the scene.
 func (s *VRInputSystem) OnAddEntity(newEntity scene.Entity) {
-	// NOP
+	// we cache the player and their ship for moving around based on input
+	name := newEntity.GetName()
+	if name == playerEntityName {
+		s.playerEntity = newEntity.(*VisibleEntity)
+	} else if name == playerShipEntityName {
+		s.playerShipEntity = newEntity.(*ShipEntity)
+	}
 }
 
 // OnRemoveEntity should get called by the scene Manager each time an entity
 // has been removed from the scene.
 func (s *VRInputSystem) OnRemoveEntity(oldEntity scene.Entity) {
-	// NOP
+	name := oldEntity.GetName()
+	if name == playerEntityName {
+		s.playerEntity = nil
+	} else if name == playerShipEntityName {
+		s.playerShipEntity = nil
+	}
 }
 
 // GetRequestedPriority returns the requested priority level for the System

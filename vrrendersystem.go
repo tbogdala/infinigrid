@@ -1,4 +1,4 @@
-// Copyright 2016, Timothy Bogdala <tdb@animal-machine.com>
+// Copyright 2017, Timothy Bogdala <tdb@animal-machine.com>
 // See the LICENSE file for more details.
 
 package main
@@ -21,8 +21,6 @@ import (
 const (
 	vrRenderSystemPriority = 100.0
 	vrRenderSystemName     = "VRRenderSystem"
-	nearView               = 0.1
-	farView                = 300.0
 )
 
 // VRRenderSystem implements fizzle/scene/System interface and handles the rendering
@@ -30,8 +28,7 @@ const (
 type VRRenderSystem struct {
 	Renderer   *forward.ForwardRenderer
 	MainWindow *glfw.Window
-
-	gfx graphics.GraphicsProvider
+	gfx        graphics.GraphicsProvider
 
 	currentWindowWidth  int
 	currentWindowHeight int
@@ -61,6 +58,16 @@ func NewVRRenderSystem() *VRRenderSystem {
 	rs := new(VRRenderSystem)
 	rs.visibleEntities = []scene.Entity{}
 	return rs
+}
+
+// GetRenderer returns the internal renderer being used.
+func (rs *VRRenderSystem) GetRenderer() *forward.ForwardRenderer {
+	return rs.Renderer
+}
+
+// GetMainWindow returns the internal renderer being used.
+func (rs *VRRenderSystem) GetMainWindow() *glfw.Window {
+	return rs.MainWindow
 }
 
 // GetVRSystem returns the vr.System interface that was obtained during Initialize().
@@ -153,7 +160,7 @@ func (rs *VRRenderSystem) initGraphics(title string, w int, h int, rw int, rh in
 	}
 
 	// request a OpenGL 3.3 core context
-	glfw.WindowHint(glfw.Samples, 0)
+	glfw.WindowHint(glfw.Samples, glSamples)
 	glfw.WindowHint(glfw.ContextVersionMajor, 3)
 	glfw.WindowHint(glfw.ContextVersionMinor, 3)
 	glfw.WindowHint(glfw.OpenGLForwardCompatible, glfw.True)
@@ -230,6 +237,10 @@ func (rs *VRRenderSystem) OnRemoveEntity(oldEntity scene.Entity) {
 		}
 	}
 	rs.visibleEntities = surviving
+
+	if oldEntity.GetName() == playerEntityName {
+		rs.cachedPlayerEntity = nil
+	}
 }
 
 // Update renderers the known entities.
