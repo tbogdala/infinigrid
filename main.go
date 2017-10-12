@@ -80,10 +80,20 @@ func main() {
 	}
 
 	////////////////////////////////////////////////////////////////////////////
+	// construct the user interface system
+	uisys := NewUISystem()
+	err = uisys.Initialize(renderSystem)
+	if err != nil {
+		fmt.Printf("Failed to initialize the user interface! %v", err)
+		return
+	}
+
+	////////////////////////////////////////////////////////////////////////////
 	// create a scene manager
 	gameScene := NewGameScene()
 	gameScene.AddSystem(renderSceneSystem)
 	gameScene.AddSystem(inputSceneSystem)
+	gameScene.AddSystem(uisys)
 
 	// create some objects and lights
 	gameScene.SetupScene()
@@ -112,6 +122,9 @@ func main() {
 
 		// update our last frame time
 		lastFrame = thisFrame
+
+		// draw the screen
+		mainWindow.SwapBuffers()
 	}
 
 	vr.Shutdown()

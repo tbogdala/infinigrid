@@ -22,6 +22,11 @@ const (
 	floorSizeWidth = 20.0
 )
 
+const (
+	gameStatePlaying    = 1
+	gameStatePlayerDied = 2
+)
+
 // GameScene is the main game scene that plays the current level.
 type GameScene struct {
 	// embed the basic scene manager
@@ -41,6 +46,8 @@ type GameScene struct {
 
 	lastGridSpawn     float64
 	distanceTravelled float64
+
+	gameState int
 }
 
 // NewGameScene creates a new game scene object
@@ -60,6 +67,11 @@ func (s *GameScene) Update(frameDelta float32) {
 
 	// call the base version which will update the systems
 	s.BasicSceneManager.Update(frameDelta)
+
+	// if the player is dead we don't do anything on update
+	if s.gameState == gameStatePlayerDied {
+		return
+	}
 
 	// ======================================================================
 	// HACK: spawn walls here
@@ -90,9 +102,18 @@ func (s *GameScene) Update(frameDelta float32) {
 		}
 	})
 
-	//	if collisionFound {
-	//		fmt.Printf("COLLISION FOUND!\n")
-	//	}
+	// if the player hits a wall it's considered the end of the road!
+	if collisionFound && s.gameState != gameStatePlayerDied {
+		fmt.Printf("====DEBGU==== collision found with wall!\n")
+
+		s.gameState = gameStatePlayerDied
+
+		system := s.BasicSceneManager.GetSystemByName(uiSystemName)
+		uisys := system.(*UISystem)
+		uisys.SetVisible(true)
+		uisys.ShowQuitMenu()
+		fmt.Printf("====DEBGU==== UI should be visible\n")
+	}
 
 	// calculate the distance the ship has travelled so far
 	dist := float64(s.shipEntity.currentShipSpeed.Mul(s.currentFrameDelta)[2])
@@ -169,9 +190,8 @@ func (s *GameScene) SetupScene() error {
 	s.components = component.NewManager(s.textureMan, s.shaders)
 
 	// TODO: don't hardcode the component references here
-	s.components.LoadComponentFromFile("assets/components/ship.json", "entity/ship")
-	s.components.LoadComponentFromFile("assets/components/wall_8mx4m.json", "geom/wall_8mx4m")
-	s.components.LoadComponentFromFile("assets/components/grid_prototype.json", "grid/proto")
+	s.components.LoadComponentFromFile("assets/components/grid_ship.json", "entity/ship")
+	s.components.LoadComponentFromFile("assets/components/level_prototype.json", "grid/proto")
 
 	// put a light in there
 	renderer := renderSystem.GetRenderer()
@@ -215,6 +235,9 @@ func (s *GameScene) SetupScene() error {
 	s.playerEntity.Name = playerEntityName
 	s.playerEntity.SetLocation(s.shipEntity.GetLocation().Add(mgl.Vec3{0.0, 0.2, -0.25}))
 	s.AddEntity(s.playerEntity)
+
+	// set the state to playing
+	s.gameState = gameStatePlaying
 
 	return nil
 }

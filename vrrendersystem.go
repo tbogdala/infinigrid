@@ -19,7 +19,7 @@ import (
 )
 
 const (
-	vrRenderSystemPriority = 100.0
+	vrRenderSystemPriority = 90.0
 	vrRenderSystemName     = "VRRenderSystem"
 )
 

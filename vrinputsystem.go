@@ -181,9 +181,7 @@ func (s *VRInputSystem) movePlayer(frameDelta float32) {
 	const moveSpeed = 20.0 // 1 m/s
 	shipLoc := s.playerShipEntity.GetLocation()
 	shipLoc[0] -= moveSpeed * rollRatio * frameDelta
-	shipLoc[0] = mgl.Clamp(shipLoc[0], -floorSizeWidth/2.0, floorSizeWidth/2.0)
 	shipLoc[1] -= moveSpeed * pitchRatio * frameDelta
-	shipLoc[1] = mgl.Clamp(shipLoc[1], 0.1, 3.0)
 	s.playerShipEntity.SetLocation(shipLoc)
 
 	// HACK: glue the HMD to the ship

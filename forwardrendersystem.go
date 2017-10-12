@@ -18,7 +18,7 @@ import (
 )
 
 const (
-	forwardRenderSystemPriority = 100.0
+	forwardRenderSystemPriority = 90.0
 	forwardRenderSystemName     = "RenderSystem"
 )
 
@@ -68,6 +68,8 @@ func (rs *ForwardRenderSystem) Initialize(windowName string, w int, h int) error
 	rs.gfx.Enable(graphics.MIPMAP)
 	rs.gfx.Enable(graphics.BLEND)
 	rs.gfx.BlendFunc(graphics.SRC_ALPHA, graphics.ONE_MINUS_SRC_ALPHA)
+	rs.gfx.Disable(graphics.SCISSOR_TEST)
+
 	return nil
 }
 
@@ -197,7 +199,4 @@ func (rs *ForwardRenderSystem) Update(frameDelta float32) {
 			}
 		}
 	}
-
-	// draw the screen
-	rs.MainWindow.SwapBuffers()
 }

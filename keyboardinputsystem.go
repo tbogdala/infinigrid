@@ -75,9 +75,7 @@ func (s *KeyboardInputSystem) Update(frameDelta float32) {
 	pitchRatio := s.playerShipEntity.currentShipPitch / maxPitchRads
 	shipLoc := s.playerShipEntity.GetLocation()
 	shipLoc[0] -= shipMoveSpeed * rollRatio * frameDelta
-	shipLoc[0] = mgl.Clamp(shipLoc[0], -floorSizeWidth/2.0, floorSizeWidth/2.0)
 	shipLoc[1] -= shipMoveSpeed * pitchRatio * frameDelta
-	shipLoc[1] = mgl.Clamp(shipLoc[1], 0.1, 3.0)
 	s.playerShipEntity.SetLocation(shipLoc)
 }
 
