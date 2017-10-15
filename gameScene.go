@@ -5,6 +5,7 @@ package main
 
 import (
 	"fmt"
+	"math/rand"
 
 	mgl "github.com/go-gl/mathgl/mgl32"
 
@@ -49,7 +50,24 @@ type GameScene struct {
 	lastBombSpawn     float64
 	distanceTravelled float64
 
+	spawnIntervalSec float64
+	maxToSpawn       int
+
 	gameState int
+}
+
+// ScrollableEntity is an entity that scrolls past the player while the game plays.
+// This should include things like wall sets and bombs.
+type ScrollableEntity interface {
+	// ScrollPastPlayer should move the entity with relation to the inverse
+	// of the player speed, adjusted for frame delta.
+	ScrollPastPlayer(backwardSpeed mgl.Vec3, frameDelta float32)
+}
+
+// CollisionEntity should be implemented for all entities that can collide with other objects.
+type CollisionEntity interface {
+	// GetColliders should return all of the coarse colliders for an entity.
+	GetColliders() []glider.Collider
 }
 
 // NewGameScene creates a new game scene object
@@ -57,6 +75,11 @@ func NewGameScene() *GameScene {
 	gs := new(GameScene)
 	gs.BasicSceneManager = scene.NewBasicSceneManager()
 	gs.shaders = make(map[string]*fizzle.RenderShader)
+
+	// starting difficulty
+	gs.spawnIntervalSec = 2.0
+	gs.maxToSpawn = 12
+
 	return gs
 }
 
@@ -93,10 +116,10 @@ func (s *GameScene) Update(frameDelta float32) {
 			return
 		}
 
-		visibleEntity, okay := e.(*VisibleEntity)
+		collisionEntity, okay := e.(CollisionEntity)
 		if okay {
-			for _, colObject := range visibleEntity.CoarseColliders {
-				for _, shipColObject := range s.shipEntity.CoarseColliders {
+			for _, colObject := range collisionEntity.GetColliders() {
+				for _, shipColObject := range s.shipEntity.GetColliders() {
 					if glider.Collide(colObject, shipColObject) != glider.NoIntersect {
 						collisionFound = true
 						break
@@ -125,9 +148,9 @@ func (s *GameScene) Update(frameDelta float32) {
 	s.distanceTravelled += dist
 
 	// ======================================================================
-	// HACK: go through all entities and update positions of everything
+	// go through all entities and update positions of everything
 	// that's not the player
-	wallsToRemove := []scene.Entity{}
+	toRemove := []scene.Entity{}
 	backwardSpeed := s.shipEntity.currentShipSpeed.Mul(-s.currentFrameDelta)
 	s.BasicSceneManager.MapEntities(func(id uint64, e scene.Entity) {
 		// skip the ship and the player entities
@@ -135,32 +158,21 @@ func (s *GameScene) Update(frameDelta float32) {
 			return
 		}
 
-		// move the floor grid in a special way. we only move it a fraction of a meter.
-		// once it's deviated more than a meter away we recenter it on world origin so that
-		// we never run out of grid plane.
-		/*
-			if strings.HasPrefix(e.GetName(), "GridProto_") {
-				loc := e.GetLocation().Add(backwardSpeed)
-				// only handles movement on z axis right now
-				if loc[2] < -1.0 {
-					loc[2] += 1.0
-				}
-				e.SetLocation(loc)
-				return
+		// see if it implements the ScrollableEntity interface
+		scrollableEntity, scrollable := e.(ScrollableEntity)
+		if scrollable {
+			scrollableEntity.ScrollPastPlayer(backwardSpeed, frameDelta)
+
+			// if it's far away, list it for removal
+			if e.GetLocation()[2] < -200.0 {
+				fmt.Printf("DEBUG removing entity: %s at %v\n", e.GetName(), e.GetLocation())
+				toRemove = append(toRemove, e)
 			}
-		*/
-
-		// move everything else back the current speed of the ship
-		loc := e.GetLocation().Add(backwardSpeed)
-		e.SetLocation(loc)
-
-		// HACK: bad test
-		if loc[2] < -200.0 {
-			wallsToRemove = append(wallsToRemove, e)
 		}
+
 	})
-	for _, toRemove := range wallsToRemove {
-		s.RemoveEntity(toRemove)
+	for _, e := range toRemove {
+		s.RemoveEntity(e)
 	}
 }
 
@@ -220,10 +232,10 @@ func (s *GameScene) SetupScene() error {
 	// create the grid
 	gridProtoComponent, _ := s.components.GetComponent("grid/proto")
 	var gridProtoRenderable *fizzle.Renderable
-	var gridProtoEntity *VisibleEntity
+	var gridProtoEntity *WallSetEntity
 	for z := float32(12.5); z <= 312.5; z += 25.0 {
 		gridProtoRenderable = s.components.GetRenderableInstance(gridProtoComponent)
-		gridProtoEntity = NewVisibleEntity()
+		gridProtoEntity = NewWallSetEntity()
 		gridProtoEntity.CreateCollidersFromComponent(gridProtoComponent)
 		gridProtoEntity.ID = s.GetNextID()
 		gridProtoEntity.Name = fmt.Sprintf("GridProto_pre%d", int(z))
@@ -280,7 +292,7 @@ func (s *GameScene) SpawnNewWalls() {
 	if s.lastGridSpawn > gridSegmentLength {
 		gridProtoComponent, _ := s.components.GetComponent("grid/proto")
 		gridProtoRenderable := s.components.GetRenderableInstance(gridProtoComponent)
-		gridProtoEntity := NewVisibleEntity()
+		gridProtoEntity := NewWallSetEntity()
 		gridProtoEntity.CreateCollidersFromComponent(gridProtoComponent)
 		gridProtoEntity.ID = s.GetNextID()
 		gridProtoEntity.Name = fmt.Sprintf("GridProto_%d", int(s.distanceTravelled))
@@ -296,29 +308,39 @@ func (s *GameScene) SpawnNewWalls() {
 // SpawnNewBombs will spawn new bombs for the player to avoid.
 func (s *GameScene) SpawnNewBombs() {
 	const spawnDistance = 250.0
-	const spawnLocX = 0.0
-	const spawnLocY = 7.5
-	const spawnIntervalSec = 3.0
+	const minToSpawn = 1
+	const minX = -10
+	const maxX = 10
+	const minY = 1
+	const maxY = 14
+	const minZDelta = -10
+	const maxZDelta = 10
 
 	// return now if we haven't hit the spawn timer
-	if s.currentGameTime-s.lastBombSpawn <= spawnIntervalSec {
+	if s.currentGameTime-s.lastBombSpawn <= s.spawnIntervalSec {
 		return
 	}
 
-	// spawn a new bomb
-	bombComponent, _ := s.components.GetComponent("entity/bomb")
-	if bombComponent == nil {
-		panic("Couldn't get bomb component DEBUG")
-	}
-	bombRenderable := s.components.GetRenderableInstance(bombComponent)
-	bombEntity := NewVisibleEntity()
-	bombEntity.CreateCollidersFromComponent(bombComponent)
-	bombEntity.ID = s.GetNextID()
-	bombEntity.Name = fmt.Sprintf("Bomb_%d", int(s.distanceTravelled))
-	bombEntity.Renderable = bombRenderable
-	bombEntity.SetLocation(mgl.Vec3{spawnLocX, spawnLocY, spawnDistance})
-	s.AddEntity(bombEntity)
+	spawnCount := rand.Intn(s.maxToSpawn-minToSpawn) + minToSpawn
 
+	// spawn new bombs
+	bombComponent, _ := s.components.GetComponent("entity/bomb")
+	for i := 0; i < spawnCount; i++ {
+		bombRenderable := s.components.GetRenderableInstance(bombComponent)
+		bombEntity := NewBombEntity()
+		bombEntity.CreateCollidersFromComponent(bombComponent)
+		bombEntity.ID = s.GetNextID()
+		bombEntity.Name = fmt.Sprintf("Bomb_%d_%d", i, int(s.distanceTravelled))
+		bombEntity.Renderable = bombRenderable
+
+		x := rand.Intn(maxX-minX) + minX
+		y := rand.Intn(maxY-minY) + minY
+		z := rand.Intn(maxZDelta-minZDelta) + minZDelta
+
+		bombEntity.SetLocation(mgl.Vec3{float32(x), float32(y), float32(spawnDistance + z)})
+		bombEntity.SetMaxSpeed()
+		s.AddEntity(bombEntity)
+	}
 	// reset the timer
 	s.lastBombSpawn = s.currentGameTime
 }

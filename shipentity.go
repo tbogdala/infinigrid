@@ -7,6 +7,7 @@ import (
 	"math"
 
 	mgl "github.com/go-gl/mathgl/mgl32"
+	"github.com/tbogdala/glider"
 )
 
 // max roll and pitch speeds for input
@@ -34,4 +35,9 @@ func NewShipEntity() *ShipEntity {
 	se := new(ShipEntity)
 	se.VisibleEntity = NewVisibleEntity()
 	return se
+}
+
+// GetColliders should return all of the coarse colliders for an entity.
+func (s *ShipEntity) GetColliders() []glider.Collider {
+	return s.VisibleEntity.CoarseColliders
 }

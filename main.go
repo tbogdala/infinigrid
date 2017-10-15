@@ -6,7 +6,10 @@ package main
 import (
 	"flag"
 	"fmt"
+	"math/rand"
+	"os"
 	"runtime"
+	"runtime/pprof"
 	"time"
 
 	"github.com/tbogdala/fizzle/scene"
@@ -26,7 +29,8 @@ const (
 var (
 	kbModel *input.KeyboardModel
 
-	flagUseVR = flag.Bool("vr", false, "run the game in VR mode")
+	flagUseVR      = flag.Bool("vr", false, "run the game in VR mode")
+	flagCPUProfile = flag.String("cpuprofile", "", "provide a filename for the output pprof file")
 )
 
 func init() {
@@ -36,6 +40,24 @@ func init() {
 func main() {
 	var err error
 	flag.Parse()
+
+	// potentially enable cpu profiling
+	if *flagCPUProfile != "" {
+		fmt.Printf("Enabling CPU Profiling!\n")
+		cpuPprofF, err := os.Create(*flagCPUProfile)
+		if err != nil {
+			fmt.Println(err.Error())
+			return
+		}
+		pprof.StartCPUProfile(cpuPprofF)
+		defer func() {
+			pprof.StopCPUProfile()
+			cpuPprofF.Close()
+		}()
+	}
+
+	// seed the RNG
+	rand.Seed(time.Now().UnixNano())
 
 	var renderSystem RenderSystem
 	var renderSceneSystem scene.System
