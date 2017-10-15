@@ -4,6 +4,9 @@
 package main
 
 import (
+	"math"
+	"math/rand"
+
 	mgl "github.com/go-gl/mathgl/mgl32"
 	"github.com/tbogdala/glider"
 )
@@ -16,14 +19,18 @@ const (
 type BombEntity struct {
 	*VisibleEntity
 
-	currentSpeed mgl.Vec3 // m/s
+	currentSpeed         mgl.Vec3 // m/s
+	movementCurveYOffset float64
+	movementCurveXOffset float64
 }
 
 // NewBombEntity returns a new bomb entity object.
 func NewBombEntity() *BombEntity {
-	be := new(BombEntity)
-	be.VisibleEntity = NewVisibleEntity()
-	return be
+	b := new(BombEntity)
+	b.VisibleEntity = NewVisibleEntity()
+	b.movementCurveYOffset = rand.Float64() * 2.0
+	b.movementCurveXOffset = rand.Float64() * 2.0
+	return b
 }
 
 // SetMaxSpeed sets the bomb entity to it's maximum speed.
@@ -38,6 +45,10 @@ func (b *BombEntity) ScrollPastPlayer(backwardSpeed mgl.Vec3, frameDelta float32
 	// in addition to the normal backward speed we're going to add
 	// the speed of the bomb.
 	totalSpeed := backwardSpeed.Add(b.currentSpeed.Mul(frameDelta))
+
+	// now we do a little wave adjustment
+	totalSpeed[0] = totalSpeed[0] + float32(math.Cos(gameScene.currentGameTime+b.movementCurveXOffset))*frameDelta
+	totalSpeed[1] = totalSpeed[1] + float32(math.Sin(gameScene.currentGameTime+b.movementCurveYOffset))*frameDelta
 
 	// move everything else back the current speed of the ship
 	loc := b.GetLocation().Add(totalSpeed)

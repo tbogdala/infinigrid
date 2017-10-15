@@ -27,7 +27,8 @@ const (
 )
 
 var (
-	kbModel *input.KeyboardModel
+	kbModel   *input.KeyboardModel
+	gameScene *GameScene
 
 	flagUseVR      = flag.Bool("vr", false, "run the game in VR mode")
 	flagCPUProfile = flag.String("cpuprofile", "", "provide a filename for the output pprof file")
@@ -112,7 +113,7 @@ func main() {
 
 	////////////////////////////////////////////////////////////////////////////
 	// create a scene manager
-	gameScene := NewGameScene()
+	gameScene = NewGameScene()
 	gameScene.AddSystem(renderSceneSystem)
 	gameScene.AddSystem(inputSceneSystem)
 	gameScene.AddSystem(uisys)
@@ -136,7 +137,7 @@ func main() {
 	////////////////////////////////////////////////////////////////////////////
 	// the main application loop
 	lastFrame := time.Now()
-	for !mainWindow.ShouldClose() {
+	for !mainWindow.ShouldClose() && !gameScene.ShouldClose {
 		// calculate the difference in time to control rotation speed
 		thisFrame := time.Now()
 		frameDelta := float32(thisFrame.Sub(lastFrame).Seconds())

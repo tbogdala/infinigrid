@@ -53,7 +53,8 @@ type GameScene struct {
 	spawnIntervalSec float64
 	maxToSpawn       int
 
-	gameState int
+	gameState   int
+	ShouldClose bool
 }
 
 // ScrollableEntity is an entity that scrolls past the player while the game plays.
@@ -108,7 +109,7 @@ func (s *GameScene) Update(frameDelta float32) {
 	s.SpawnNewBombs()
 
 	// ======================================================================
-	// HACK: check colliders vs ship to see if we have a hit
+	// check colliders vs ship to see if we have a hit
 	collisionFound := false
 	s.BasicSceneManager.MapEntities(func(id uint64, e scene.Entity) {
 		// skip the ship and the player entities
@@ -139,7 +140,16 @@ func (s *GameScene) Update(frameDelta float32) {
 		system := s.BasicSceneManager.GetSystemByName(uiSystemName)
 		uisys := system.(*UISystem)
 		uisys.SetVisible(true)
-		uisys.ShowQuitMenu()
+		uisys.ShowQuitMenu(
+			func() { s.ShouldClose = true },
+			func() {
+				err := s.ResetScene()
+				if err != nil {
+					fmt.Printf("Could not reset the game: %v\n", err)
+					s.ShouldClose = true
+					return
+				}
+			})
 	}
 
 	// calculate the distance the ship has travelled so far
@@ -164,8 +174,7 @@ func (s *GameScene) Update(frameDelta float32) {
 			scrollableEntity.ScrollPastPlayer(backwardSpeed, frameDelta)
 
 			// if it's far away, list it for removal
-			if e.GetLocation()[2] < -200.0 {
-				fmt.Printf("DEBUG removing entity: %s at %v\n", e.GetName(), e.GetLocation())
+			if e.GetLocation()[2] < -100.0 {
 				toRemove = append(toRemove, e)
 			}
 		}
@@ -174,6 +183,25 @@ func (s *GameScene) Update(frameDelta float32) {
 	for _, e := range toRemove {
 		s.RemoveEntity(e)
 	}
+}
+
+// ResetScene removes all entities and regenerates the initial scene
+func (s *GameScene) ResetScene() error {
+	// remove all existing entities
+	s.MapEntities(func(id uint64, e scene.Entity) {
+		s.RemoveEntity(e)
+	})
+
+	s.currentGameTime = 0.0
+	s.lastGridSpawn = 0.0
+	s.lastBombSpawn = 0.0
+	s.distanceTravelled = 0.0
+
+	s.spawnIntervalSec = 2.0
+	s.maxToSpawn = 12
+
+	// now that things are cleaned up, setup a new scene
+	return s.SetupScene()
 }
 
 // SetupScene initializes the scene's assets and sets up the initial entities.
@@ -196,44 +224,52 @@ func (s *GameScene) SetupScene() error {
 	}
 
 	// load the shaders necessary
-	err := s.createShaders()
-	if err != nil {
-		return err
+	if len(s.shaders) < 1 {
+		err := s.createShaders()
+		if err != nil {
+			return err
+		}
 	}
 
 	// setup the texture manager for use in the component manager
-	s.textureMan = fizzle.NewTextureManager()
+	if s.textureMan == nil {
+		s.textureMan = fizzle.NewTextureManager()
+	}
 
 	// create the component manager
-	s.components = component.NewManager(s.textureMan, s.shaders)
+	if s.components == nil {
+		s.components = component.NewManager(s.textureMan, s.shaders)
 
-	// TODO: don't hardcode the component references here
-	_, err = s.components.LoadComponentFromFile("assets/components/grid_ship.json", "entity/ship")
-	if err != nil {
-		return fmt.Errorf("failed to load the entity/ship component: %v", err)
-	}
-	_, err = s.components.LoadComponentFromFile("assets/components/grid_bomb.json", "entity/bomb")
-	if err != nil {
-		return fmt.Errorf("failed to load the entity/bomb component: %v", err)
-	}
-	_, err = s.components.LoadComponentFromFile("assets/components/level_prototype.json", "grid/proto")
-	if err != nil {
-		return fmt.Errorf("failed to load the grid/proto component: %v", err)
+		// TODO: don't hardcode the component references here
+		_, err := s.components.LoadComponentFromFile("assets/components/grid_ship.json", "entity/ship")
+		if err != nil {
+			return fmt.Errorf("failed to load the entity/ship component: %v", err)
+		}
+		_, err = s.components.LoadComponentFromFile("assets/components/grid_bomb.json", "entity/bomb")
+		if err != nil {
+			return fmt.Errorf("failed to load the entity/bomb component: %v", err)
+		}
+		_, err = s.components.LoadComponentFromFile("assets/components/level_prototype.json", "grid/proto")
+		if err != nil {
+			return fmt.Errorf("failed to load the grid/proto component: %v", err)
+		}
 	}
 
 	// put a light in there
 	renderer := renderSystem.GetRenderer()
-	light := renderer.NewDirectionalLight(mgl.Vec3{1.0, -0.5, -1.0})
-	light.DiffuseIntensity = 0.20
-	light.SpecularIntensity = 0.10
-	light.AmbientIntensity = 1.0
-	renderer.ActiveLights[0] = light
+	if renderer.ActiveLights[0] == nil {
+		light := renderer.NewDirectionalLight(mgl.Vec3{1.0, -0.5, -1.0})
+		light.DiffuseIntensity = 0.20
+		light.SpecularIntensity = 0.10
+		light.AmbientIntensity = 1.0
+		renderer.ActiveLights[0] = light
+	}
 
 	// create the grid
 	gridProtoComponent, _ := s.components.GetComponent("grid/proto")
 	var gridProtoRenderable *fizzle.Renderable
 	var gridProtoEntity *WallSetEntity
-	for z := float32(12.5); z <= 312.5; z += 25.0 {
+	for z := float32(12.5); z <= 212.5; z += 25.0 {
 		gridProtoRenderable = s.components.GetRenderableInstance(gridProtoComponent)
 		gridProtoEntity = NewWallSetEntity()
 		gridProtoEntity.CreateCollidersFromComponent(gridProtoComponent)
@@ -287,7 +323,7 @@ func (s *GameScene) createShaders() error {
 // the time is right.
 func (s *GameScene) SpawnNewWalls() {
 	const gridSegmentLength = 25.0
-	const spawnDistance = 300.0 + (gridSegmentLength / 2.0)
+	const spawnDistance = 200.0 + (gridSegmentLength / 2.0)
 
 	if s.lastGridSpawn > gridSegmentLength {
 		gridProtoComponent, _ := s.components.GetComponent("grid/proto")

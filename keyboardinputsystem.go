@@ -62,6 +62,11 @@ func (s *KeyboardInputSystem) Update(frameDelta float32) {
 	// advise GLFW to poll for input. without this the window appears to hang.
 	glfw.PollEvents()
 
+	// if the game state is in the player died state, do not process input
+	if gameScene.gameState == gameStatePlayerDied {
+		return
+	}
+
 	// handle any keyboard input
 	s.kbModel.CheckKeyPresses()
 

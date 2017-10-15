@@ -69,27 +69,38 @@ func (s *UISystem) SetVisible(vis bool) {
 }
 
 // ShowQuitMenu will render a window with a message prompting the user to replay or quit.
-func (s *UISystem) ShowQuitMenu() {
+func (s *UISystem) ShowQuitMenu(onQuit func(), onRetry func()) {
 	s.mainMenuWnd = s.uiman.NewWindow("Menu", 0.4, 0.6, 0.2, 0.25, func(wnd *gui.Window) {
-		wnd.Text("GAME OVER")
+		wnd.Text("GAME OVER!")
+
+		wnd.StartRow()
+		wnd.Text(fmt.Sprintf("Distance travelled: %.1f", gameScene.distanceTravelled))
 
 		wnd.StartRow()
 		wnd.Separator()
 
 		wnd.StartRow()
 		wnd.RequestItemWidthMin(.5)
-		onQuit, _ := wnd.Button("QuitButton", "Quit")
+		quit, _ := wnd.Button("QuitButton", "Quit")
 		wnd.RequestItemWidthMin(.5)
-		onReplay, _ := wnd.Button("ReplayButton", "Play Again")
+		replay, _ := wnd.Button("ReplayButton", "Play Again")
+		wnd.StartRow()
 
-		_ = onQuit
-		_ = onReplay
+		if onQuit != nil && quit {
+			s.visible = false
+			onQuit()
+		}
+
+		if onRetry != nil && replay {
+			s.visible = false
+			onRetry()
+		}
 	})
 
 	s.mainMenuWnd.Title = "Menu"
 	s.mainMenuWnd.ShowTitleBar = false
 	s.mainMenuWnd.IsMoveable = false
-	s.mainMenuWnd.AutoAdjustHeight = false
+	s.mainMenuWnd.AutoAdjustHeight = true
 	s.mainMenuWnd.ShowScrollBar = false
 	s.mainMenuWnd.IsScrollable = false
 }
