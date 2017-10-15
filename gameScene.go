@@ -44,7 +44,9 @@ type GameScene struct {
 	shaders           map[string]*fizzle.RenderShader
 	currentFrameDelta float32
 
+	currentGameTime   float64
 	lastGridSpawn     float64
+	lastBombSpawn     float64
 	distanceTravelled float64
 
 	gameState int
@@ -64,6 +66,7 @@ func (s *GameScene) Update(frameDelta float32) {
 	// this will allow for callback from the input system to see the
 	// current frame delta.
 	s.currentFrameDelta = frameDelta
+	s.currentGameTime += float64(frameDelta)
 
 	// call the base version which will update the systems
 	s.BasicSceneManager.Update(frameDelta)
@@ -74,8 +77,12 @@ func (s *GameScene) Update(frameDelta float32) {
 	}
 
 	// ======================================================================
-	// HACK: spawn walls here
+	// test to see if we need to spawn walls
 	s.SpawnNewWalls()
+
+	// ======================================================================
+	// test to see if we need to spawn some bombs
+	s.SpawnNewBombs()
 
 	// ======================================================================
 	// HACK: check colliders vs ship to see if we have a hit
@@ -102,17 +109,14 @@ func (s *GameScene) Update(frameDelta float32) {
 		}
 	})
 
-	// if the player hits a wall it's considered the end of the road!
+	// if the player hits another entity it's considered the end of the road!
 	if collisionFound && s.gameState != gameStatePlayerDied {
-		fmt.Printf("====DEBGU==== collision found with wall!\n")
-
 		s.gameState = gameStatePlayerDied
 
 		system := s.BasicSceneManager.GetSystemByName(uiSystemName)
 		uisys := system.(*UISystem)
 		uisys.SetVisible(true)
 		uisys.ShowQuitMenu()
-		fmt.Printf("====DEBGU==== UI should be visible\n")
 	}
 
 	// calculate the distance the ship has travelled so far
@@ -134,15 +138,17 @@ func (s *GameScene) Update(frameDelta float32) {
 		// move the floor grid in a special way. we only move it a fraction of a meter.
 		// once it's deviated more than a meter away we recenter it on world origin so that
 		// we never run out of grid plane.
-		if e.GetName() == "GridFloor" {
-			loc := e.GetLocation().Add(backwardSpeed)
-			// only handles movement on z axis right now
-			if loc[2] < -1.0 {
-				loc[2] += 1.0
+		/*
+			if strings.HasPrefix(e.GetName(), "GridProto_") {
+				loc := e.GetLocation().Add(backwardSpeed)
+				// only handles movement on z axis right now
+				if loc[2] < -1.0 {
+					loc[2] += 1.0
+				}
+				e.SetLocation(loc)
+				return
 			}
-			e.SetLocation(loc)
-			return
-		}
+		*/
 
 		// move everything else back the current speed of the ship
 		loc := e.GetLocation().Add(backwardSpeed)
@@ -183,15 +189,25 @@ func (s *GameScene) SetupScene() error {
 		return err
 	}
 
-	// load some textures
+	// setup the texture manager for use in the component manager
 	s.textureMan = fizzle.NewTextureManager()
 
 	// create the component manager
 	s.components = component.NewManager(s.textureMan, s.shaders)
 
 	// TODO: don't hardcode the component references here
-	s.components.LoadComponentFromFile("assets/components/grid_ship.json", "entity/ship")
-	s.components.LoadComponentFromFile("assets/components/level_prototype.json", "grid/proto")
+	_, err = s.components.LoadComponentFromFile("assets/components/grid_ship.json", "entity/ship")
+	if err != nil {
+		return fmt.Errorf("failed to load the entity/ship component: %v", err)
+	}
+	_, err = s.components.LoadComponentFromFile("assets/components/grid_bomb.json", "entity/bomb")
+	if err != nil {
+		return fmt.Errorf("failed to load the entity/bomb component: %v", err)
+	}
+	_, err = s.components.LoadComponentFromFile("assets/components/level_prototype.json", "grid/proto")
+	if err != nil {
+		return fmt.Errorf("failed to load the grid/proto component: %v", err)
+	}
 
 	// put a light in there
 	renderer := renderSystem.GetRenderer()
@@ -205,7 +221,7 @@ func (s *GameScene) SetupScene() error {
 	gridProtoComponent, _ := s.components.GetComponent("grid/proto")
 	var gridProtoRenderable *fizzle.Renderable
 	var gridProtoEntity *VisibleEntity
-	for z := float32(12.5); z <= 212.5; z += 25.0 {
+	for z := float32(12.5); z <= 312.5; z += 25.0 {
 		gridProtoRenderable = s.components.GetRenderableInstance(gridProtoComponent)
 		gridProtoEntity = NewVisibleEntity()
 		gridProtoEntity.CreateCollidersFromComponent(gridProtoComponent)
@@ -216,7 +232,7 @@ func (s *GameScene) SetupScene() error {
 		s.AddEntity(gridProtoEntity)
 	}
 
-	// FIXME: quick test to make sure I can add the ship in
+	// add the ship in
 	shipComponent, _ := s.components.GetComponent("entity/ship")
 	shipRenderable := s.components.GetRenderableInstance(shipComponent)
 	s.shipEntity = NewShipEntity()
@@ -259,7 +275,7 @@ func (s *GameScene) createShaders() error {
 // the time is right.
 func (s *GameScene) SpawnNewWalls() {
 	const gridSegmentLength = 25.0
-	const spawnDistance = 200.0 + (gridSegmentLength / 2.0)
+	const spawnDistance = 300.0 + (gridSegmentLength / 2.0)
 
 	if s.lastGridSpawn > gridSegmentLength {
 		gridProtoComponent, _ := s.components.GetComponent("grid/proto")
@@ -275,4 +291,34 @@ func (s *GameScene) SpawnNewWalls() {
 		//fmt.Printf("Created grid proto: %s\n", gridProtoEntity.Name)
 		s.lastGridSpawn = 0.0
 	}
+}
+
+// SpawnNewBombs will spawn new bombs for the player to avoid.
+func (s *GameScene) SpawnNewBombs() {
+	const spawnDistance = 250.0
+	const spawnLocX = 0.0
+	const spawnLocY = 7.5
+	const spawnIntervalSec = 3.0
+
+	// return now if we haven't hit the spawn timer
+	if s.currentGameTime-s.lastBombSpawn <= spawnIntervalSec {
+		return
+	}
+
+	// spawn a new bomb
+	bombComponent, _ := s.components.GetComponent("entity/bomb")
+	if bombComponent == nil {
+		panic("Couldn't get bomb component DEBUG")
+	}
+	bombRenderable := s.components.GetRenderableInstance(bombComponent)
+	bombEntity := NewVisibleEntity()
+	bombEntity.CreateCollidersFromComponent(bombComponent)
+	bombEntity.ID = s.GetNextID()
+	bombEntity.Name = fmt.Sprintf("Bomb_%d", int(s.distanceTravelled))
+	bombEntity.Renderable = bombRenderable
+	bombEntity.SetLocation(mgl.Vec3{spawnLocX, spawnLocY, spawnDistance})
+	s.AddEntity(bombEntity)
+
+	// reset the timer
+	s.lastBombSpawn = s.currentGameTime
 }

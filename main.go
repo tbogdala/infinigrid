@@ -96,7 +96,11 @@ func main() {
 	gameScene.AddSystem(uisys)
 
 	// create some objects and lights
-	gameScene.SetupScene()
+	err = gameScene.SetupScene()
+	if err != nil {
+		fmt.Printf("Failed to setup the game scene. %v\n", err)
+		return
+	}
 
 	////////////////////////////////////////////////////////////////////////////
 	// set the callback functions for key input common to all input systems
