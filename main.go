@@ -88,7 +88,7 @@ func main() {
 	} else {
 		// no vr flag was specified so construct a normal renderer
 		forwardRenderSystem := NewForwardRenderSystem()
-		err = forwardRenderSystem.Initialize("GRID", windowWidth, windowHeight)
+		err = forwardRenderSystem.Initialize("Infinigrid", windowWidth, windowHeight)
 		if err != nil {
 			fmt.Printf("Failed to initialize the VR render system! %v", err)
 			return

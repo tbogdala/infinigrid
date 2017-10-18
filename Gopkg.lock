@@ -26,22 +26,22 @@
   revision = "e2365dfdc4a05e4b8299a783240d4a7d5a65d4e4"
 
 [[projects]]
-  branch = "development"
   name = "github.com/tbogdala/eweygewey"
   packages = [".","embeddedfonts","glfwinput"]
-  revision = "a9e5eee6e1b3b9b5993190639df1e950346c1ad9"
+  revision = "3a487316a7c34a2377a865cb2c313162fb21e715"
+  version = "v0.3.2"
 
 [[projects]]
-  branch = "development"
   name = "github.com/tbogdala/fizzle"
   packages = [".","component","graphicsprovider","graphicsprovider/opengl","input/glfwinput","renderer","renderer/forward","scene"]
-  revision = "ac975eb1efba52ab20c7113b02943ce13069f323"
+  revision = "13acef88cee2a9247d54636aff53517d3a556b01"
+  version = "v0.3.1"
 
 [[projects]]
-  branch = "development"
   name = "github.com/tbogdala/glider"
   packages = ["."]
-  revision = "5d7160b47eaec66f0ce47b06d1103bae4d7c0c39"
+  revision = "94a0bfa719cb1e9157b573905b9966f994b8896c"
+  version = "v0.2.1"
 
 [[projects]]
   branch = "master"
@@ -56,10 +56,10 @@
   version = "v1.0.0"
 
 [[projects]]
-  branch = "development"
   name = "github.com/tbogdala/openvr-go"
   packages = [".","util/fizzlevr"]
-  revision = "f82e667e2d123bf3ea71e4bc2c86820a0b8f0355"
+  revision = "12844a031f04997f3a7c0f86080642ec02053dd1"
+  version = "v0.4.2"
 
 [[projects]]
   branch = "master"
@@ -76,6 +76,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "da67c65cff08169be1bbd73b65a78e24131a47d3b8ac1c6f093df137920e03d7"
+  inputs-digest = "ae658093b8353890f6f21ab3dc7f80e7869feb0a680edc4c0831c248a400ff6c"
   solver-name = "gps-cdcl"
   solver-version = 1

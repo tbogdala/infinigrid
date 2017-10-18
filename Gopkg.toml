@@ -30,17 +30,17 @@
   name = "github.com/go-gl/mathgl"
 
 [[constraint]]
-  branch = "development"
   name = "github.com/tbogdala/eweygewey"
+  version = "0.3.2"
 
 [[constraint]]
   name = "github.com/tbogdala/fizzle"
-  branch = "development"
+  version = "0.3.1"
 
 [[constraint]]
   name = "github.com/tbogdala/glider"
-  branch = "development"
+  version = "0.2.1"
 
 [[constraint]]
   name = "github.com/tbogdala/openvr-go"
-  branch = "development"
+  version = "0.4.2"
