@@ -4,6 +4,8 @@
 package main
 
 import (
+	"fmt"
+
 	mgl "github.com/go-gl/mathgl/mgl32"
 	scene "github.com/tbogdala/fizzle/scene"
 	vr "github.com/tbogdala/openvr-go"
@@ -140,6 +142,11 @@ func (s *VRInputSystem) Update(frameDelta float32) {
 		foundLeft = true
 	}
 
+	// if the game state is in the player died state do not move the player
+	if gameScene.gameState == gameStatePlayerDied {
+		return
+	}
+
 	// after updating the controller state, adjust the player position
 	// based on the input.
 	s.movePlayer(frameDelta)
@@ -170,12 +177,12 @@ func (s *VRInputSystem) movePlayer(frameDelta float32) {
 	pitchInput := orientation[2] // axisData[0].Y
 	s.playerShipEntity.currentShipPitch = pitchInput * maxPitchRads
 
-	// HACK: and rotate the ship
+	// rotate the ship
 	qRoll := mgl.QuatRotate(s.playerShipEntity.currentShipRoll, mgl.Vec3{0.0, 0.0, 1.0})
 	qPitch := mgl.QuatRotate(s.playerShipEntity.currentShipPitch, mgl.Vec3{1.0, 0.0, 0.0})
 	s.playerShipEntity.SetOrientation(qRoll.Mul(qPitch))
 
-	// HACK: move the ship around
+	// move the ship around
 	rollRatio := s.playerShipEntity.currentShipRoll / maxRollRads
 	pitchRatio := s.playerShipEntity.currentShipPitch / maxPitchRads
 	const moveSpeed = 20.0 // 1 m/s
@@ -184,12 +191,29 @@ func (s *VRInputSystem) movePlayer(frameDelta float32) {
 	shipLoc[1] -= moveSpeed * pitchRatio * frameDelta
 	s.playerShipEntity.SetLocation(shipLoc)
 
-	// HACK: glue the HMD to the ship
+	// glue the HMD to the ship
 	hmdLoc := s.vrRenderSystem.GetHMDLocation()
 	s.playerEntity.SetLocation(s.playerShipEntity.GetLocation().Add(mgl.Vec3{
 		0.0 - hmdLoc[0],
 		0.2 - hmdLoc[1],
 		-0.5 - hmdLoc[2]}))
+}
+
+// HandleMenuButtonInput should be invoked when the top menu button on the
+// vive controller is pressed.
+func (s *VRInputSystem) HandleMenuButtonInput() {
+	// if the game is in the PlayerDied state, this button will reset the game.
+	if gameScene.gameState == gameStatePlayerDied {
+		err := gameScene.ResetScene()
+		if err != nil {
+			fmt.Printf("Could not reset the game: %v\n", err)
+			gameScene.ShouldClose = true
+		}
+		return
+	}
+
+	// otherwise, use this button to auto level the HMD
+	s.HandleHeadAutoLevel()
 }
 
 // HandleHeadAutoLevel should be called to set the auto-level 'head' position. This allows

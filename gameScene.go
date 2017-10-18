@@ -21,6 +21,7 @@ const (
 	playerShipEntityName = "PlayerShip"
 
 	floorSizeWidth = 20.0
+	playerSpawnY   = 5.0
 )
 
 const (
@@ -45,10 +46,10 @@ type GameScene struct {
 	shaders           map[string]*fizzle.RenderShader
 	currentFrameDelta float32
 
-	currentGameTime   float64
-	lastGridSpawn     float64
-	lastBombSpawn     float64
-	distanceTravelled float64
+	currentGameTime        float64
+	distSinceLastGridSpawn float64
+	lastBombSpawn          float64
+	distanceTravelled      float64
 
 	spawnIntervalSec float64
 	maxToSpawn       int
@@ -137,24 +138,31 @@ func (s *GameScene) Update(frameDelta float32) {
 	if collisionFound && s.gameState != gameStatePlayerDied {
 		s.gameState = gameStatePlayerDied
 
+		// this system will be non-nil for the non-vr mode and will
+		// show a dialog box presenting the user with choices to
+		// replay or quit.
+		//
+		// vr games handle resetting the gameScene in their input controller.
 		system := s.BasicSceneManager.GetSystemByName(uiSystemName)
-		uisys := system.(*UISystem)
-		uisys.SetVisible(true)
-		uisys.ShowQuitMenu(
-			func() { s.ShouldClose = true },
-			func() {
-				err := s.ResetScene()
-				if err != nil {
-					fmt.Printf("Could not reset the game: %v\n", err)
-					s.ShouldClose = true
-					return
-				}
-			})
+		if system != nil {
+			uisys := system.(*UISystem)
+			uisys.SetVisible(true)
+			uisys.ShowQuitMenu(
+				func() { s.ShouldClose = true },
+				func() {
+					err := s.ResetScene()
+					if err != nil {
+						fmt.Printf("Could not reset the game: %v\n", err)
+						s.ShouldClose = true
+						return
+					}
+				})
+		}
 	}
 
 	// calculate the distance the ship has travelled so far
 	dist := float64(s.shipEntity.currentShipSpeed.Mul(s.currentFrameDelta)[2])
-	s.lastGridSpawn += dist
+	s.distSinceLastGridSpawn += dist
 	s.distanceTravelled += dist
 
 	// ======================================================================
@@ -193,7 +201,7 @@ func (s *GameScene) ResetScene() error {
 	})
 
 	s.currentGameTime = 0.0
-	s.lastGridSpawn = 0.0
+	s.distSinceLastGridSpawn = 0.0
 	s.lastBombSpawn = 0.0
 	s.distanceTravelled = 0.0
 
@@ -287,7 +295,7 @@ func (s *GameScene) SetupScene() error {
 	s.shipEntity.CreateCollidersFromComponent(shipComponent)
 	s.shipEntity.ID = s.GetNextID()
 	s.shipEntity.Renderable = shipRenderable
-	s.shipEntity.SetLocation(mgl.Vec3{0.0, 2.0, 0.0})
+	s.shipEntity.SetLocation(mgl.Vec3{0.0, playerSpawnY, 0.0})
 	s.shipEntity.Name = playerShipEntityName
 	s.AddEntity(s.shipEntity)
 	s.shipEntity.currentShipSpeed = mgl.Vec3{0.0, 0.0, 25.0}
@@ -325,7 +333,8 @@ func (s *GameScene) SpawnNewWalls() {
 	const gridSegmentLength = 25.0
 	const spawnDistance = 200.0 + (gridSegmentLength / 2.0)
 
-	if s.lastGridSpawn > gridSegmentLength {
+	overshot := float32(s.distSinceLastGridSpawn - gridSegmentLength)
+	if overshot > 0.0 {
 		gridProtoComponent, _ := s.components.GetComponent("grid/proto")
 		gridProtoRenderable := s.components.GetRenderableInstance(gridProtoComponent)
 		gridProtoEntity := NewWallSetEntity()
@@ -333,11 +342,15 @@ func (s *GameScene) SpawnNewWalls() {
 		gridProtoEntity.ID = s.GetNextID()
 		gridProtoEntity.Name = fmt.Sprintf("GridProto_%d", int(s.distanceTravelled))
 		gridProtoEntity.Renderable = gridProtoRenderable
-		gridProtoEntity.SetLocation(mgl.Vec3{0, 0, spawnDistance})
+		gridProtoEntity.SetLocation(mgl.Vec3{0, 0, spawnDistance - overshot})
 		s.AddEntity(gridProtoEntity)
 
+		// we created the wall at the spawn distance, adjusted for any travels past the
+		// grid segment length.
+		// so now we keep the remaining overshot so everything will line up again.
+		s.distSinceLastGridSpawn = float64(overshot)
+
 		//fmt.Printf("Created grid proto: %s\n", gridProtoEntity.Name)
-		s.lastGridSpawn = 0.0
 	}
 }
 

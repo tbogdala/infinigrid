@@ -1,12 +1,11 @@
 *.exe
 *.dll
 *.swp
+*.so
 .vscode
 debug
-grid
+infinigrid
 *~
 
-# we don't version the assets here
-assets-src
-assets
-
+# let dep manage this folder
+vendor

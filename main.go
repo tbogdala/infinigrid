@@ -63,12 +63,13 @@ func main() {
 	var renderSystem RenderSystem
 	var renderSceneSystem scene.System
 	var inputSceneSystem scene.System
+	var uiSceneSystem scene.System
 
 	// setup vr mode if indicated via command line flag
 	if *flagUseVR {
 		// create the render system and initialize it
 		vrRenderSystem := NewVRRenderSystem()
-		err = vrRenderSystem.Initialize("GRID", windowWidth, windowHeight)
+		err = vrRenderSystem.Initialize("Infinigrid", windowWidth, windowHeight)
 		if err != nil {
 			fmt.Printf("Failed to initialize the VR render system! %v", err)
 			return
@@ -79,7 +80,7 @@ func main() {
 		vrInputSystem.Initialize(vrRenderSystem)
 
 		// wire some inputs for the vive wands
-		vrInputSystem.OnAppMenuButtonL = vrInputSystem.HandleHeadAutoLevel
+		vrInputSystem.OnAppMenuButtonL = vrInputSystem.HandleMenuButtonInput
 
 		renderSystem = vrRenderSystem
 		renderSceneSystem = vrRenderSystem
@@ -97,18 +98,18 @@ func main() {
 		kbInputSystem := NewKeyboardInputSystem()
 		kbInputSystem.Initialize(forwardRenderSystem.GetMainWindow())
 
+		// use a 'traditional' user interface system for the game UI
+		uisys := NewUISystem()
+		err = uisys.Initialize(forwardRenderSystem)
+		if err != nil {
+			fmt.Printf("Failed to initialize the user interface! %v", err)
+			return
+		}
+
 		renderSystem = forwardRenderSystem
 		renderSceneSystem = forwardRenderSystem
 		inputSceneSystem = kbInputSystem
-	}
-
-	////////////////////////////////////////////////////////////////////////////
-	// construct the user interface system
-	uisys := NewUISystem()
-	err = uisys.Initialize(renderSystem)
-	if err != nil {
-		fmt.Printf("Failed to initialize the user interface! %v", err)
-		return
+		uiSceneSystem = uisys
 	}
 
 	////////////////////////////////////////////////////////////////////////////
@@ -116,7 +117,7 @@ func main() {
 	gameScene = NewGameScene()
 	gameScene.AddSystem(renderSceneSystem)
 	gameScene.AddSystem(inputSceneSystem)
-	gameScene.AddSystem(uisys)
+	gameScene.AddSystem(uiSceneSystem)
 
 	// create some objects and lights
 	err = gameScene.SetupScene()
