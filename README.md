@@ -64,5 +64,5 @@ Attribution-ShareAlike 4.0 (CC BY-SA 4.0)][ccbysa4] license.
 [golang]: https://golang.org/
 [fizzle]: https://github.com/tbogdala/fizzle
 [ovrgo]: https://github.com/tbogdala/openvr-go
-[godep]: https://github.com/tools/godep
+[godep]: https://github.com/golang/dep
 [ccbysa4]: https://creativecommons.org/licenses/by-sa/4.0/
