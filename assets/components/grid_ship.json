@@ -1,0 +1,76 @@
+{
+    "Name": "Ship",
+    "Location": [
+        0,
+        0,
+        0
+    ],
+    "Meshes": [
+        {
+            "Name": "ShipHull",
+            "Material": {
+                "ShaderName": "Basic",
+                "Diffuse": [
+                    1,
+                    1,
+                    1,
+                    1
+                ],
+                "Specular": [
+                    1,
+                    1,
+                    1,
+                    1
+                ],
+                "Shininess": 0,
+                "GenerateMipmaps": true,
+                "DiffuseTexture": "../textures/512/grid_ship.png",
+                "NormalsTexture": "",
+                "SpecularTexture": "",
+                "Textures": null
+            },
+            "SrcFile": "../../assets-src/models/grid_ship.obj",
+            "BinFile": "../models/ship.gombz",
+            "Offset": [
+                0,
+                0,
+                0
+            ],
+            "Scale": [
+                1,
+                1,
+                1
+            ],
+            "RotationAxis": [
+                0,
+                0,
+                0
+            ],
+            "RotationDegrees": 0
+        }
+    ],
+    "ChildReferences": null,
+    "Collisions": [
+        {
+            "Type": 0,
+            "Min": [
+                -0.09999999,
+                -0.02,
+                -0.049999997
+            ],
+            "Max": [
+                0.08999999,
+                0.03,
+                0.059999995
+            ],
+            "Radius": 1,
+            "Offset": [
+                0,
+                0,
+                0
+            ],
+            "Tags": null
+        }
+    ],
+    "Properties": null
+}

@@ -1,0 +1,96 @@
+{
+    "Name": "Bomb",
+    "Location": [
+        0,
+        0,
+        0
+    ],
+    "Meshes": [
+        {
+            "Name": "Bomb",
+            "Material": {
+                "ShaderName": "Basic",
+                "Diffuse": [
+                    1,
+                    1,
+                    1,
+                    1
+                ],
+                "Specular": [
+                    1,
+                    1,
+                    1,
+                    1
+                ],
+                "Shininess": 0,
+                "GenerateMipmaps": true,
+                "DiffuseTexture": "../textures/512/grid_bomb.png",
+                "NormalsTexture": "",
+                "SpecularTexture": "",
+                "Textures": null
+            },
+            "SrcFile": "../../assets-src/models/grid_bomb.obj",
+            "BinFile": "../models/grid_bomb.gombz",
+            "Offset": [
+                0,
+                0,
+                0
+            ],
+            "Scale": [
+                1,
+                1,
+                1
+            ],
+            "RotationAxis": [
+                0,
+                1,
+                0
+            ],
+            "RotationDegrees": 180
+        }
+    ],
+    "ChildReferences": null,
+    "Collisions": [
+        {
+            "Type": 1,
+            "Min": [
+                0,
+                0,
+                0
+            ],
+            "Max": [
+                0,
+                0,
+                0
+            ],
+            "Radius": 0.7,
+            "Offset": [
+                0,
+                0,
+                0
+            ],
+            "Tags": null
+        },
+        {
+            "Type": 0,
+            "Min": [
+                -0.64999926,
+                -0.61999965,
+                1.2399992
+            ],
+            "Max": [
+                0.6499996,
+                0.61999965,
+                1.9799988
+            ],
+            "Radius": 1,
+            "Offset": [
+                0,
+                0,
+                0
+            ],
+            "Tags": null
+        }
+    ],
+    "Properties": null
+}

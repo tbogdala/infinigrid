@@ -1,0 +1,262 @@
+{
+    "Name": "LevelPrototype",
+    "Location": [
+        0,
+        0,
+        0
+    ],
+    "Meshes": [
+        {
+            "Name": "Floor",
+            "Material": {
+                "ShaderName": "Basic",
+                "Diffuse": [
+                    1,
+                    1,
+                    1,
+                    1
+                ],
+                "Specular": [
+                    1,
+                    1,
+                    1,
+                    1
+                ],
+                "Shininess": 0,
+                "GenerateMipmaps": true,
+                "DiffuseTexture": "../textures/512/level_segment_floor.png",
+                "NormalsTexture": "",
+                "SpecularTexture": "",
+                "Textures": null
+            },
+            "SrcFile": "../../assets-src/models/level_segment_floor.obj",
+            "BinFile": "../models/level_segment_floor.gombz",
+            "Offset": [
+                0,
+                0,
+                0
+            ],
+            "Scale": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "RotationAxis": [
+                0,
+                0,
+                0
+            ],
+            "RotationDegrees": 0
+        },
+        {
+            "Name": "Wall Left",
+            "Material": {
+                "ShaderName": "Basic",
+                "Diffuse": [
+                    1,
+                    1,
+                    1,
+                    1
+                ],
+                "Specular": [
+                    1,
+                    1,
+                    1,
+                    1
+                ],
+                "Shininess": 0,
+                "GenerateMipmaps": false,
+                "DiffuseTexture": "../textures/512/level_segment_wall.l.png",
+                "NormalsTexture": "",
+                "SpecularTexture": "",
+                "Textures": []
+            },
+            "SrcFile": "../../assets-src/models/level_segment_wall.l.obj",
+            "BinFile": "../models/level_segment_wall.l.gombz",
+            "Offset": [
+                0,
+                0,
+                0
+            ],
+            "Scale": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "RotationAxis": [
+                0,
+                0,
+                0
+            ],
+            "RotationDegrees": 0
+        },
+        {
+            "Name": "Wall Right",
+            "Material": {
+                "ShaderName": "Basic",
+                "Diffuse": [
+                    1,
+                    1,
+                    1,
+                    1
+                ],
+                "Specular": [
+                    1,
+                    1,
+                    1,
+                    1
+                ],
+                "Shininess": 0,
+                "GenerateMipmaps": true,
+                "DiffuseTexture": "../textures/512/level_segment_wall.r.png",
+                "NormalsTexture": "",
+                "SpecularTexture": "",
+                "Textures": null
+            },
+            "SrcFile": "../../assets-src/models/level_segment_wall.r.obj",
+            "BinFile": "../models/level_segment_wall.r.gombz",
+            "Offset": [
+                0,
+                0,
+                0
+            ],
+            "Scale": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "RotationAxis": [
+                0,
+                0,
+                0
+            ],
+            "RotationDegrees": 0
+        },
+        {
+            "Name": "Ceil",
+            "Material": {
+                "ShaderName": "Basic",
+                "Diffuse": [
+                    1,
+                    1,
+                    1,
+                    1
+                ],
+                "Specular": [
+                    1,
+                    1,
+                    1,
+                    1
+                ],
+                "Shininess": 0,
+                "GenerateMipmaps": true,
+                "DiffuseTexture": "../textures/512/level_segment_ceil.png",
+                "NormalsTexture": "",
+                "SpecularTexture": "",
+                "Textures": null
+            },
+            "SrcFile": "../../assets-src/models/level_segment_ceil.obj",
+            "BinFile": "../models/level_segment_ceil.gombz",
+            "Offset": [
+                0,
+                0,
+                0
+            ],
+            "Scale": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "RotationAxis": [
+                0,
+                0,
+                0
+            ],
+            "RotationDegrees": 0
+        }
+    ],
+    "ChildReferences": null,
+    "Collisions": [
+        {
+            "Type": 0,
+            "Min": [
+                -15.0,
+                -1,
+                -12.5
+            ],
+            "Max": [
+                15.0,
+                0,
+                12.5
+            ],
+            "Radius": 0,
+            "Offset": [
+                0,
+                0,
+                0
+            ],
+            "Tags": null
+        },
+        {
+            "Type": 0,
+            "Min": [
+                -15.0,
+                15.0,
+                -12.5
+            ],
+            "Max": [
+                15.0,
+                16.0,
+                12.5
+            ],
+            "Radius": 0,
+            "Offset": [
+                0,
+                0,
+                0
+            ],
+            "Tags": null
+        },
+        {
+            "Type": 0,
+            "Min": [
+                15.0,
+                0,
+                -12.5
+            ],
+            "Max": [
+                16.0,
+                15.0,
+                12.5
+            ],
+            "Radius": 0,
+            "Offset": [
+                0,
+                0,
+                0
+            ],
+            "Tags": null
+        },
+        {
+            "Type": 0,
+            "Min": [
+                -16.0,
+                0,
+                -12.5
+            ],
+            "Max": [
+                -15.0,
+                15.0,
+                12.5
+            ],
+            "Radius": 0,
+            "Offset": [
+                0,
+                0,
+                0
+            ],
+            "Tags": null
+        }
+    ],
+    "Properties": null
+}
