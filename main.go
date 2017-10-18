@@ -30,8 +30,9 @@ var (
 	kbModel   *input.KeyboardModel
 	gameScene *GameScene
 
-	flagUseVR      = flag.Bool("vr", false, "run the game in VR mode")
-	flagCPUProfile = flag.String("cpuprofile", "", "provide a filename for the output pprof file")
+	flagUseVR        = flag.Bool("vr", false, "run the game in VR mode")
+	flagUseSingleEye = flag.Bool("oneeye", false, "uses a single-eye view for the application window in VR")
+	flagCPUProfile   = flag.String("cpuprofile", "", "provide a filename for the output pprof file")
 )
 
 func init() {
@@ -69,7 +70,15 @@ func main() {
 	if *flagUseVR {
 		// create the render system and initialize it
 		vrRenderSystem := NewVRRenderSystem()
-		err = vrRenderSystem.Initialize("Infinigrid", windowWidth, windowHeight)
+		vrRenderSystem.UseSingleEyeView = *flagUseSingleEye
+
+		// scale the window size if we're doing single-eye views
+		scaledW := windowWidth
+		if vrRenderSystem.UseSingleEyeView {
+			scaledW = int(float32(windowHeight) * 0.9)
+		}
+
+		err = vrRenderSystem.Initialize("Infinigrid", scaledW, windowHeight)
 		if err != nil {
 			fmt.Printf("Failed to initialize the VR render system! %v", err)
 			return

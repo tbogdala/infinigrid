@@ -30,6 +30,10 @@ type VRRenderSystem struct {
 	MainWindow *glfw.Window
 	gfx        graphics.GraphicsProvider
 
+	// this can be set to true to render a single-eye view in the application window
+	// on the desktop instead of the distortion lens which combines both
+	UseSingleEyeView bool
+
 	currentWindowWidth  int
 	currentWindowHeight int
 
@@ -46,6 +50,7 @@ type VRRenderSystem struct {
 	eyeFramebufferRight *fizzlevr.EyeFramebuffer
 	hmdPose             mgl.Mat4
 	hmdLoc              mgl.Vec3
+	plainEyeQuad        *fizzle.Renderable
 
 	visibleEntities []scene.Entity
 
@@ -141,6 +146,16 @@ func (rs *VRRenderSystem) Initialize(windowName string, w int, h int) error {
 		return fmt.Errorf("Failed to get the compositor interface: %v", err)
 	}
 
+	// we can create a single plane with a basic texture mapping shader to draw
+	// one of the eyes onto the main window without the distortion that you'd
+	// get when rendering with the distortionLens object.
+	rs.plainEyeQuad = fizzle.CreatePlaneXY(0, 0, float32(w), float32(h))
+	rs.plainEyeQuad.Material = fizzle.NewMaterial()
+	rs.plainEyeQuad.Material.Shader, err = forward.CreateDiffuseUnlitShader()
+	if err != nil {
+		return fmt.Errorf("Failed to create render plane for the eye framebuffer: %v", err)
+	}
+
 	// set some OpenGL flags
 	rs.gfx.Enable(graphics.CULL_FACE)
 	rs.gfx.Enable(graphics.DEPTH_TEST)
@@ -148,6 +163,21 @@ func (rs *VRRenderSystem) Initialize(windowName string, w int, h int) error {
 	rs.gfx.Enable(graphics.BLEND)
 	rs.gfx.BlendFunc(graphics.SRC_ALPHA, graphics.ONE_MINUS_SRC_ALPHA)
 	return nil
+}
+
+func (rs *VRRenderSystem) renderUITex(r *fizzle.Renderable, tex graphics.Texture) {
+	gfx := fizzle.GetGraphics()
+
+	gfx.BindTexture(graphics.TEXTURE_2D, tex)
+	gfx.TexParameteri(graphics.TEXTURE_2D, graphics.TEXTURE_COMPARE_MODE, graphics.NONE)
+	gfx.BindTexture(graphics.TEXTURE_2D, 0)
+
+	r.Material.DiffuseTex = tex
+	width, height := rs.Renderer.GetResolution()
+	ortho := mgl.Ortho(0, float32(width), 0, float32(height), -10, 10)
+	view := mgl.Ident4()
+	rs.Renderer.DrawRenderable(r, nil, ortho, view, nil)
+	gfx.BindTexture(graphics.TEXTURE_2D, 0)
 }
 
 // initGraphics creates an OpenGL window and initializes the required graphics libraries.
@@ -179,7 +209,6 @@ func (rs *VRRenderSystem) initGraphics(title string, w int, h int, rw int, rh in
 	rs.MainWindow.SetSizeCallback(func(w *glfw.Window, width int, height int) {
 		rs.currentWindowWidth = width
 		rs.currentWindowHeight = height
-		rs.Renderer.ChangeResolution(int32(width), int32(height))
 	})
 
 	rs.MainWindow.MakeContextCurrent()
@@ -248,8 +277,16 @@ func (rs *VRRenderSystem) Update(frameDelta float32) {
 	// draw the framebuffers
 	rs.renderStereoTargets()
 
-	// draw the framebuffers to the window
-	rs.distortionLens.Render(int32(rs.currentWindowWidth), int32(rs.currentWindowHeight))
+	// draw the framebuffers to the window using the distortion lens or a single-eye view
+	if !rs.UseSingleEyeView {
+		rs.distortionLens.Render(int32(rs.currentWindowWidth), int32(rs.currentWindowHeight))
+	} else {
+		gfx := fizzle.GetGraphics()
+		gfx.Disable(graphics.DEPTH_TEST)
+		gfx.Enable(graphics.TEXTURE_2D)
+		rs.renderUITex(rs.plainEyeQuad, rs.eyeFramebufferLeft.ResolveTexture)
+		gfx.Enable(graphics.DEPTH_TEST)
+	}
 
 	// send the framebuffer textures out to the compositor for rendering to the HMD
 	rs.vrCompositor.Submit(vr.EyeLeft, uint32(rs.eyeFramebufferLeft.ResolveTexture))
