@@ -14,6 +14,11 @@ Installation
 Currently binaries must be built by source which will require [Go][golang] to be installed. 
 Dependencies are handled by the [dep][godep] tool, so [Go][golang] 1.8+ will be required.
 
+This repository does use [git lfs][gitlfs] so you will need to have that installed before
+cloning the repo to avoid complication. Also, make sure to run `git lfs install` to make
+sure the git hooks are installed! A symptom of not getting [git lfs][gitlfs] right is that
+the binary files in the `assets` folders will all be pointers and not actual textures and models.
+
 ```bash
 go get github.com/tbogdala/infinigrid
 cd $GOHOME/src/github.com/tbogdala/infinigrid
@@ -66,3 +71,4 @@ Attribution-ShareAlike 4.0 (CC BY-SA 4.0)][ccbysa4] license.
 [ovrgo]: https://github.com/tbogdala/openvr-go
 [godep]: https://github.com/golang/dep
 [ccbysa4]: https://creativecommons.org/licenses/by-sa/4.0/
+[gitlfs]: https://git-lfs.github.com/
